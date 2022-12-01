@@ -63,26 +63,13 @@ public abstract class CompositeContextNodeHandler<S extends State> extends State
             NodeFactory<?, ?> startNode = embeddedSubProcess.startNode(parserContext.newId()).name("EmbeddedStart");
             NodeFactory<?, ?> currentNode = startNode;
             for (Action action : actions) {
-                ActionDataFilter actionFilter = action.getActionDataFilter();
-                String fromExpr = null;
-                String resultExpr = null;
-                String toExpr = null;
-                boolean useData = true;
-                if (actionFilter != null) {
-                    fromExpr = actionFilter.getFromStateData();
-                    resultExpr = actionFilter.getResults();
-                    toExpr = actionFilter.getToStateData();
-                    useData = actionFilter.isUseResults();
-                }
                 Sleep sleep = action.getSleep();
                 if (sleep != null && sleep.getBefore() != null && !sleep.getBefore().isEmpty()) {
-                    filterAndMergeNode(embeddedSubProcess, getVarName(), fromExpr, resultExpr, toExpr, useData, shouldMerge,
-                            (factory, inputVar, outputVariable) -> getActionNode(factory, action.getSleep(), inputVar, outputVar));
+                    currentNode = connect(currentNode, createTimerNode(embeddedSubProcess, sleep.getBefore()));
                 }
                 currentNode = connect(currentNode, getActionNode(embeddedSubProcess, action, outputVar, shouldMerge));
                 if (sleep != null && sleep.getAfter() != null && !sleep.getAfter().isEmpty()) {
-                    filterAndMergeNode(embeddedSubProcess, getVarName(), fromExpr, resultExpr, toExpr, useData, shouldMerge,
-                            (factory, inputVar, outputVariable) -> getActionNode(factory, action.getSleep(), inputVar, outputVar));
+                    currentNode = connect(currentNode, createTimerNode(embeddedSubProcess, sleep.getAfter()));
                 }
             }
             connect(currentNode, embeddedSubProcess.endNode(parserContext.newId()).name("EmbeddedEnd").terminate(true)).done();
@@ -125,8 +112,7 @@ public abstract class CompositeContextNodeHandler<S extends State> extends State
         }
     }
 
-    private TimerNodeFactory getActionNode(RuleFlowNodeContainerFactory<?, ?> factory, Sleep sleep, String inputVar, String outputVar) {
-        String duration = sleep.getBefore() == null ? sleep.getAfter() : sleep.getBefore();
+    private TimerNodeFactory<?> createTimerNode(RuleFlowNodeContainerFactory<?, ?> factory, String duration) {
         return timerNode(factory.timerNode(parserContext.newId()), duration);
     }
 
